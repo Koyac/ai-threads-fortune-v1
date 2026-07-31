@@ -1,0 +1,24 @@
+name: Setup (one-time)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/build_seeds.py
+      - run: python scripts/build_ephem.py
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add seeds.jsonl ephemeris.jsonl
+          git commit -m "初回データ生成" || echo "変更なし"
+          git push
