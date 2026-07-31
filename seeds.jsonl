@@ -1,4 +1,4 @@
-{"id": "s0001", "phase": "駆け引き", "emotion": "不安", "scene": "誕生日", "used": false}
+{"id": "s0001", "phase": "駆け引き", "emotion": "不安", "scene": "誕生日", "used": true}
 {"id": "s0002", "phase": "復縁", "emotion": "不安", "scene": "元恋人のSNS", "used": false}
 {"id": "s0003", "phase": "倦怠期", "emotion": "期待", "scene": "送信取り消し", "used": false}
 {"id": "s0004", "phase": "復縁", "emotion": "期待", "scene": "週末の予定", "used": false}
