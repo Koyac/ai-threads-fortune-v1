@@ -1,0 +1,53 @@
+# 日次ジョブ: 1日6回 post.py を起動する。
+# 最後のスロット(01:00 JST = 前日16:00 UTC)のときだけ、続けて collect.py も動かす。
+#
+# GitHub Actionsのscheduleは「だいたいこの時刻」という保証で、混雑時は数分〜十数分
+# 遅れることがある。post.py 側の「取りこぼし判定」がその遅れを吸収する設計になっている。
+
+name: daily
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # 07:00 JST
+    - cron: '0 3 * * *'    # 12:00 JST
+    - cron: '0 9 * * *'    # 18:00 JST
+    - cron: '0 12 * * *'   # 21:00 JST
+    - cron: '0 14 * * *'   # 23:00 JST
+    - cron: '0 16 * * *'   # 01:00 JST (前日のUTC日付になる)
+  workflow_dispatch:       # 手動実行用(セットアップ時の動作確認などに使う)
+
+concurrency:
+  group: daily-post
+  # 実行中のジョブを強制キャンセルすると「投稿は成功したがpushが未完了」の状態のまま
+  # 中断してしまい、二重投稿につながる恐れがある。次の実行は必ず待たせる。
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 依存パッケージをインストール
+        run: pip install -r requirements.txt
+
+      - name: 投稿する (post.py)
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/post.py
+
+      - name: メトリクスを収集する (collect.py / 1日1回だけ)
+        if: github.event_name == 'schedule' && github.event.schedule == '0 16 * * *'
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        run: python scripts/collect.py

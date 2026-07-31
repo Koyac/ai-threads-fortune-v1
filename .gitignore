@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# skyfieldがbuild_ephem.py実行時に自動ダウンロードする天体暦データ(数MB〜)。
+# ソースコードではないのでコミットしない。
+de421.bsp
