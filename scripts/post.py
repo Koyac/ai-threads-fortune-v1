@@ -34,6 +34,8 @@ from google.genai import types
 from google.genai.errors import ClientError as GeminiClientError
 import requests
 
+from _secrets import redact as redact_secrets, run_safely
+
 ROOT = Path(__file__).resolve().parent.parent
 SEEDS_PATH = ROOT / "seeds.jsonl"
 EPHEM_PATH = ROOT / "ephemeris.jsonl"
@@ -239,7 +241,7 @@ def call_with_backoff(func, max_attempts: int = 5):
             # 4xx系は基本的に粘っても無駄なので、そのまま上へ返して呼び出し元に判断させる。
             if exc.code == 429 and not is_daily_quota_error(exc) and minute_quota_waits < 2:
                 minute_quota_waits += 1
-                print(f"[post] Geminiの1分あたりの上限に当たりました。60秒待って再試行します: {exc}")
+                print(f"[post] Geminiの1分あたりの上限に当たりました。60秒待って再試行します: {redact_secrets(exc)}")
                 time.sleep(60)
                 continue
             raise
@@ -247,7 +249,7 @@ def call_with_backoff(func, max_attempts: int = 5):
             if attempt == max_attempts:
                 raise
             wait_seconds = min(2 ** attempt, 30)
-            print(f"[post] Gemini呼び出し失敗(試行{attempt}/{max_attempts}): {exc} -> {wait_seconds}秒後に再試行")
+            print(f"[post] Gemini呼び出し失敗(試行{attempt}/{max_attempts}): {redact_secrets(exc)} -> {wait_seconds}秒後に再試行")
             time.sleep(wait_seconds)
 
 
@@ -512,14 +514,14 @@ AUTH_ERROR_CODES = {102, 190, 200, 2500}
 
 def _check_rate_limit(response: requests.Response) -> None:
     if response.status_code == 429:
-        raise ThreadsRateLimited(f"HTTP 429: {response.text}")
+        raise ThreadsRateLimited(f"HTTP 429: {redact_secrets(response.text)}")
     try:
         body = response.json()
     except ValueError:
         return
     error = body.get("error") if isinstance(body, dict) else None
     if error and error.get("code") in RATE_LIMIT_ERROR_CODES:
-        raise ThreadsRateLimited(f"レート制限エラー: {error}")
+        raise ThreadsRateLimited(f"レート制限エラー: {redact_secrets(error)}")
 
 
 def _raise_for_threads_error(response: requests.Response, step: str) -> None:
@@ -536,7 +538,7 @@ def _raise_for_threads_error(response: requests.Response, step: str) -> None:
         pass
 
     code = error.get("code")
-    detail = error.get("message") or response.text.strip()[:500]
+    detail = redact_secrets(error.get("message") or response.text.strip()[:500])
     raise ThreadsPostFailed(
         f"Threads APIが{step}を拒否しました (HTTP {response.status_code} / code={code}): {detail}",
         is_auth_error=code in AUTH_ERROR_CODES,
@@ -589,13 +591,13 @@ def commit_and_push(message: str, paths: list[str] | None = None, max_attempts: 
 
     commit_result = subprocess.run(["git", "commit", "-m", message], cwd=ROOT, capture_output=True, text=True)
     if commit_result.returncode != 0 and "nothing to commit" not in commit_result.stdout:
-        raise RuntimeError(f"git commit に失敗しました: {commit_result.stderr}")
+        raise RuntimeError(f"git commit に失敗しました: {redact_secrets(commit_result.stderr)}")
 
     for attempt in range(1, max_attempts + 1):
         push_result = subprocess.run(["git", "push"], cwd=ROOT, capture_output=True, text=True)
         if push_result.returncode == 0:
             return
-        print(f"[post] git push 失敗(試行{attempt}/{max_attempts}): {push_result.stderr.strip()}")
+        print(f"[post] git push 失敗(試行{attempt}/{max_attempts}): {redact_secrets(push_result.stderr.strip())}")
         # 他のジョブが先にpushしていた可能性があるので、取り込んでから再挑戦する。
         subprocess.run(["git", "pull", "--rebase"], cwd=ROOT, capture_output=True, text=True)
         time.sleep(min(2 ** attempt, 30))
@@ -674,13 +676,13 @@ def main() -> None:
             )
             calls_used += calls_made
         except RuntimeError as exc:
-            print(f"[post] {exc}")
+            print(f"[post] {redact_secrets(exc)}")
             break
         except GeminiClientError as exc:
             if exc.code == 429:
-                print(f"[post] Geminiの無料枠(1日の上限)を使い切ったため、この実行はここで終了します: {exc}")
+                print(f"[post] Geminiの無料枠(1日の上限)を使い切ったため、この実行はここで終了します: {redact_secrets(exc)}")
                 break
-            print(f"[post] Geminiがリクエストを受け付けませんでした。この実行はここで終了します: {exc}", file=sys.stderr)
+            print(f"[post] Geminiがリクエストを受け付けませんでした。この実行はここで終了します: {redact_secrets(exc)}", file=sys.stderr)
             break
         seed = seeds[seed_index]
 
@@ -690,11 +692,11 @@ def main() -> None:
         try:
             media_id = post_to_threads(text, access_token, user_id)
         except ThreadsRateLimited as exc:
-            print(f"[post] Threads APIがレート制限中のため、この実行はここで終了します: {exc}")
+            print(f"[post] Threads APIがレート制限中のため、この実行はここで終了します: {redact_secrets(exc)}")
             break
         except ThreadsPostFailed as exc:
             # 投稿は成功していないので、種は消化済みにせず次回にそのまま回す。
-            print(f"[post] 投稿に失敗しました: {exc}", file=sys.stderr)
+            print(f"[post] 投稿に失敗しました: {redact_secrets(exc)}", file=sys.stderr)
             print(f"[post] 失敗した本文({len(text)}文字): {text[:200]}", file=sys.stderr)
             if exc.is_auth_error:
                 # トークン切れは待っても直らず、人がSETUP.mdの手順でトークンを取り直すしかない。
@@ -743,4 +745,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_safely(main, "post")

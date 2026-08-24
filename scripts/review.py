@@ -24,6 +24,8 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
+from _secrets import redact as redact_secrets, run_safely
+
 ROOT = Path(__file__).resolve().parent.parent
 STRATEGY_PATH = ROOT / "strategy.md"
 LEXICON_PATH = ROOT / "gyaru_lexicon.md"
@@ -174,7 +176,7 @@ def call_gemini(client: genai.Client, prompt: str, max_attempts: int = 5) -> dic
             if attempt == max_attempts:
                 raise
             wait_seconds = min(2 ** attempt, 30)
-            print(f"[review] Gemini呼び出し失敗(試行{attempt}/{max_attempts}): {exc} -> {wait_seconds}秒後に再試行")
+            print(f"[review] Gemini呼び出し失敗(試行{attempt}/{max_attempts}): {redact_secrets(exc)} -> {wait_seconds}秒後に再試行")
             time.sleep(wait_seconds)
 
 
@@ -185,13 +187,13 @@ def commit_and_push(message: str, max_attempts: int = 10) -> None:
 
     commit_result = subprocess.run(["git", "commit", "-m", message], cwd=ROOT, capture_output=True, text=True)
     if commit_result.returncode != 0 and "nothing to commit" not in commit_result.stdout:
-        raise RuntimeError(f"git commit に失敗しました: {commit_result.stderr}")
+        raise RuntimeError(f"git commit に失敗しました: {redact_secrets(commit_result.stderr)}")
 
     for attempt in range(1, max_attempts + 1):
         push_result = subprocess.run(["git", "push"], cwd=ROOT, capture_output=True, text=True)
         if push_result.returncode == 0:
             return
-        print(f"[review] git push 失敗(試行{attempt}/{max_attempts}): {push_result.stderr.strip()}")
+        print(f"[review] git push 失敗(試行{attempt}/{max_attempts}): {redact_secrets(push_result.stderr.strip())}")
         subprocess.run(["git", "pull", "--rebase"], cwd=ROOT, capture_output=True, text=True)
     raise RuntimeError("git push が繰り返し失敗しました。")
 
@@ -239,4 +241,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_safely(main, "review")

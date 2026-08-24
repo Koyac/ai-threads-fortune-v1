@@ -19,6 +19,8 @@ from pathlib import Path
 
 import requests
 
+from _secrets import redact as redact_secrets, run_safely
+
 ROOT = Path(__file__).resolve().parent.parent
 POSTS_PATH = ROOT / "data" / "posts.jsonl"
 METRICS_PATH = ROOT / "data" / "metrics.jsonl"
@@ -64,7 +66,7 @@ def raise_for_status_without_token(response: requests.Response) -> None:
         response.raise_for_status()
     except requests.HTTPError:
         body = response.text.strip()
-        body = re.sub(r"(access_token=)[^&\s\"]+", r"\1***", body)
+        body = redact_secrets(body)
         if len(body) > 500:
             body = body[:500] + "..."
         detail = f": {body}" if body else ""
@@ -92,13 +94,13 @@ def commit_and_push(message: str, max_attempts: int = 10) -> None:
 
     commit_result = subprocess.run(["git", "commit", "-m", message], cwd=ROOT, capture_output=True, text=True)
     if commit_result.returncode != 0 and "nothing to commit" not in commit_result.stdout:
-        raise RuntimeError(f"git commit に失敗しました: {commit_result.stderr}")
+        raise RuntimeError(f"git commit に失敗しました: {redact_secrets(commit_result.stderr)}")
 
     for attempt in range(1, max_attempts + 1):
         push_result = subprocess.run(["git", "push"], cwd=ROOT, capture_output=True, text=True)
         if push_result.returncode == 0:
             return
-        print(f"[collect] git push 失敗(試行{attempt}/{max_attempts}): {push_result.stderr.strip()}")
+        print(f"[collect] git push 失敗(試行{attempt}/{max_attempts}): {redact_secrets(push_result.stderr.strip())}")
         subprocess.run(["git", "pull", "--rebase"], cwd=ROOT, capture_output=True, text=True)
     raise RuntimeError("git push が繰り返し失敗しました。")
 
@@ -119,7 +121,7 @@ def main() -> None:
             metrics = fetch_post_insights(media_id, access_token)
         except ThreadsApiError as exc:
             # 1件の投稿でエラーが起きても、他の投稿の収集は続ける。
-            print(f"[collect] post {post['id']} のインサイト取得に失敗しました: {exc}")
+            print(f"[collect] post {post['id']} のインサイト取得に失敗しました: {redact_secrets(exc)}")
             continue
 
         append_jsonl(METRICS_PATH, {
@@ -143,4 +145,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_safely(main, "collect")

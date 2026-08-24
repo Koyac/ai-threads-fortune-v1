@@ -5,3 +5,12 @@ __pycache__/
 # skyfieldがbuild_ephem.py実行時に自動ダウンロードする天体暦データ(数MB〜)。
 # ソースコードではないのでコミットしない。
 de421.bsp
+
+# 認証情報をうっかりコミットしないための保険。
+# ローカルで動かすときに使うファイルは、名前が何であれここで弾く。
+.env
+.env.*
+*.env
+secrets*.json
+*token*.txt
+*credential*
