@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def append_banned_phrases(lexicon_text: str, phrases: list[str]) -> str:
 
 
 def build_prompt(current_strategy_text: str, aggregate_report: str) -> str:
-    return f"""あなたはThreadsの恋愛占いアカウント「藍」の運用方針を、週次データに基づいて更新する担当者です。
+    return f"""あなたはThreadsの「ギャル×星座占い」アカウント「藍」の運用方針を、週次データに基づいて更新する担当者です。
 
 # 現在のstrategy.md
 {current_strategy_text}
@@ -152,16 +153,29 @@ def build_prompt(current_strategy_text: str, aggregate_report: str) -> str:
 """
 
 
-def call_gemini(client: genai.Client, prompt: str) -> dict:
-    response = client.models.generate_content(
-        model=REVIEW_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=RESPONSE_SCHEMA,
-        ),
-    )
-    return json.loads(response.text)
+def call_gemini(client: genai.Client, prompt: str, max_attempts: int = 5) -> dict:
+    """週次レビューをGeminiに依頼する。
+
+    無料枠のモデルは混雑時に 503 UNAVAILABLE を返すことがある。週1回しか動かないジョブを
+    それだけで落とさないよう、指数バックオフでリトライする(post.py と同じ考え方)。
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = client.models.generate_content(
+                model=REVIEW_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=RESPONSE_SCHEMA,
+                ),
+            )
+            return json.loads(response.text)
+        except Exception as exc:  # noqa: BLE001 - 一時的な障害を包括的に受けてリトライしたい
+            if attempt == max_attempts:
+                raise
+            wait_seconds = min(2 ** attempt, 30)
+            print(f"[review] Gemini呼び出し失敗(試行{attempt}/{max_attempts}): {exc} -> {wait_seconds}秒後に再試行")
+            time.sleep(wait_seconds)
 
 
 def commit_and_push(message: str, max_attempts: int = 10) -> None:

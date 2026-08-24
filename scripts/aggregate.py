@@ -24,9 +24,8 @@ METRICS_PATH = ROOT / "data" / "metrics.jsonl"
 JST = timezone(timedelta(hours=9))
 AGGREGATION_WINDOW_DAYS = 7
 
-# 投稿スロットは時刻の文字列だと素直に並ばない(01:00は深夜=1日の最後のスロット)ので、
-# 表示順を明示的に決めておく。
-SLOT_ORDER = ["07:00", "12:00", "18:00", "21:00", "23:00", "01:00"]
+# 投稿スロットの表示順を明示的に決めておく。
+SLOT_ORDER = ["12:00", "22:00"]
 
 
 def load_jsonl(path: Path) -> list[dict]:
