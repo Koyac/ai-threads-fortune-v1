@@ -12,6 +12,7 @@ data/metrics.jsonl に1行ずつ追記する。同じ投稿でも日を追うご
 
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -24,6 +25,10 @@ METRICS_PATH = ROOT / "data" / "metrics.jsonl"
 
 JST = timezone(timedelta(hours=9))
 POST_METRICS = "views,likes,replies,reposts,quotes"
+
+
+class ThreadsApiError(RuntimeError):
+    """Threads APIエラーを、アクセストークンを含まない形でログへ出すための例外。"""
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -54,17 +59,29 @@ def extract_metric_values(insights_response: dict) -> dict:
     return result
 
 
+def raise_for_status_without_token(response: requests.Response) -> None:
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        body = response.text.strip()
+        body = re.sub(r"(access_token=)[^&\s\"]+", r"\1***", body)
+        if len(body) > 500:
+            body = body[:500] + "..."
+        detail = f": {body}" if body else ""
+        raise ThreadsApiError(f"HTTP {response.status_code}{detail}") from None
+
+
 def fetch_post_insights(media_id: str, access_token: str) -> dict:
     url = f"https://graph.threads.net/v1.0/{media_id}/insights"
     response = requests.get(url, params={"metric": POST_METRICS, "access_token": access_token}, timeout=30)
-    response.raise_for_status()
+    raise_for_status_without_token(response)
     return extract_metric_values(response.json())
 
 
 def fetch_followers_count(user_id: str, access_token: str) -> int | None:
     url = f"https://graph.threads.net/v1.0/{user_id}/threads_insights"
     response = requests.get(url, params={"metric": "followers_count", "access_token": access_token}, timeout=30)
-    response.raise_for_status()
+    raise_for_status_without_token(response)
     return extract_metric_values(response.json()).get("followers_count")
 
 
@@ -100,7 +117,7 @@ def main() -> None:
             continue  # 投稿記録はあるがmedia_idが無い(古いテストデータ等)場合はスキップ
         try:
             metrics = fetch_post_insights(media_id, access_token)
-        except requests.HTTPError as exc:
+        except ThreadsApiError as exc:
             # 1件の投稿でエラーが起きても、他の投稿の収集は続ける。
             print(f"[collect] post {post['id']} のインサイト取得に失敗しました: {exc}")
             continue

@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>藍(あい)自動運用アーキテクチャ図解</title>
+<style>
+  :root {
+    --bg: #faf8fb;
+    --bg-elevated: #ffffff;
+    --bg-sunken: #f1ecf6;
+    --ink: #1c1730;
+    --ink-muted: #665e82;
+    --ink-faint: #9089ab;
+    --accent: #c2126b;
+    --accent-soft: #f6dced;
+    --gold: #96690a;
+    --gold-soft: #f3e7c9;
+    --line: rgba(28, 23, 48, 0.14);
+    --line-soft: rgba(28, 23, 48, 0.08);
+    --shadow: 0 18px 40px -22px rgba(28, 15, 45, 0.35);
+    --font-display: "Hiragino Mincho ProN", "Yu Mincho", "Iowan Old Style", Georgia, serif;
+    --font-body: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #120f24;
+      --bg-elevated: #1d1836;
+      --bg-sunken: #17132b;
+      --ink: #f3eefb;
+      --ink-muted: #b3a9d1;
+      --ink-faint: #7d7399;
+      --accent: #ff3d9a;
+      --accent-soft: rgba(255, 61, 154, 0.14);
+      --gold: #f5c451;
+      --gold-soft: rgba(245, 196, 81, 0.14);
+      --line: rgba(243, 238, 251, 0.14);
+      --line-soft: rgba(243, 238, 251, 0.07);
+      --shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #120f24;
+    --bg-elevated: #1d1836;
+    --bg-sunken: #17132b;
+    --ink: #f3eefb;
+    --ink-muted: #b3a9d1;
+    --ink-faint: #7d7399;
+    --accent: #ff3d9a;
+    --accent-soft: rgba(255, 61, 154, 0.14);
+    --gold: #f5c451;
+    --gold-soft: rgba(245, 196, 81, 0.14);
+    --line: rgba(243, 238, 251, 0.14);
+    --line-soft: rgba(243, 238, 251, 0.07);
+    --shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.55);
+  }
+  :root[data-theme="light"] {
+    --bg: #faf8fb;
+    --bg-elevated: #ffffff;
+    --bg-sunken: #f1ecf6;
+    --ink: #1c1730;
+    --ink-muted: #665e82;
+    --ink-faint: #9089ab;
+    --accent: #c2126b;
+    --accent-soft: #f6dced;
+    --gold: #96690a;
+    --gold-soft: #f3e7c9;
+    --line: rgba(28, 23, 48, 0.14);
+    --line-soft: rgba(28, 23, 48, 0.08);
+    --shadow: 0 18px 40px -22px rgba(28, 15, 45, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  html { color-scheme: light dark; }
+
+  .page {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: 96px 0 64px;
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(ellipse 60% 50% at 82% 8%, var(--gold-soft), transparent 60%),
+      radial-gradient(ellipse 50% 60% at 8% 30%, var(--accent-soft), transparent 60%);
+  }
+  .hero h1 {
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 500;
+    line-height: 1.3;
+    margin: 20px 0 22px;
+  }
+  .hero .sub {
+    max-width: 58ch;
+    color: var(--ink-muted);
+    font-size: 1.05rem;
+  }
+  .persona {
+    margin-top: 40px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow);
+  }
+  .persona .name { font-family: var(--font-display); font-size: 1.2rem; }
+  .persona .tag { font-size: 0.85rem; color: var(--ink-muted); }
+  .persona .tag b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin: 56px 0;
+  }
+  .stat {
+    background: var(--bg-elevated);
+    padding: 26px 22px;
+  }
+  .stat .num {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .label { font-size: 0.82rem; color: var(--ink-muted); margin-top: 6px; }
+
+  /* ---------- Section heading ---------- */
+  section.block { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  .block .kicker {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .block h2 {
+    font-size: 1.7rem;
+    font-weight: 500;
+    margin: 10px 0 14px;
+  }
+  .block > .lede {
+    color: var(--ink-muted);
+    max-width: 62ch;
+    margin-bottom: 36px;
+  }
+
+  /* ---------- Rule cards ---------- */
+  .rule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .rule {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--accent);
+    padding: 22px 20px;
+  }
+  .rule h3 { font-size: 1.02rem; font-weight: 600; margin-bottom: 10px; }
+  .rule p { font-size: 0.92rem; color: var(--ink-muted); margin: 0; }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
+    padding: 26px 26px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .callout .q {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    padding-top: 4px;
+  }
+  .callout p { margin: 0 0 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout code {
+    font-family: var(--font-mono);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+
+  /* ---------- System diagram ---------- */
+  .wrap.wide { max-width: 1040px; }
+  .diagram-scroll {
+    overflow-x: auto;
+    margin: 4px 0 32px;
+  }
+  .diagram-scroll svg {
+    min-width: 760px;
+    display: block;
+    margin: 0 auto;
+  }
+  .legend-wrap { max-width: 820px; margin: 0 auto; }
+  .table-scroll { overflow-x: auto; }
+  .legend-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  .legend-table th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .legend-table td {
+    padding: 13px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    color: var(--ink-muted);
+  }
+  .legend-table tr:last-child td { border-bottom: none; }
+  .legend-table td:first-child {
+    color: var(--ink);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    white-space: nowrap;
+  }
+  .legend-table code {
+    font-family: var(--font-mono);
+    background: var(--bg-sunken);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  /* ---------- Clock ---------- */
+  .clock-wrap { display: flex; justify-content: center; margin: 8px 0 20px; }
+  .clock-face {
+    position: relative;
+    width: 420px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, var(--bg-elevated) 0%, var(--bg-sunken) 78%);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  .clock-ring {
+    position: absolute;
+    inset: 14%;
+    border: 1px dashed var(--line);
+    border-radius: 50%;
+  }
+  .clock-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    gap: 2px;
+  }
+  .clock-center .n { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent); }
+  .clock-center .l { font-size: 0.72rem; color: var(--ink-faint); max-width: 9ch; }
+  .slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .slot .dot {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 0 5px var(--gold-soft);
+  }
+  .slot .time {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .clock-caption {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    max-width: 46ch;
+    margin: 4px auto 0;
+  }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .step {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    padding: 18px 16px;
+    position: relative;
+  }
+  .step .idx {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .step h4 { font-size: 0.94rem; font-weight: 600; margin: 8px 0 6px; }
+  .step p { font-size: 0.84rem; color: var(--ink-muted); margin: 0; }
+  .step.ai { border-top: 2px solid var(--accent); }
+  .step.ai .idx { color: var(--accent); }
+
+  /* ---------- Weekly loop ---------- */
+  .loop {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .loop .step {
+    flex: 1 1 200px;
+  }
+  .loop-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    padding: 0 6px;
+    font-size: 1.1rem;
+  }
+  .loop-back {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-faint);
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+  }
+  .loop-back .ring {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    border-top-color: transparent;
+    flex: none;
+  }
+
+  /* ---------- Stack chips ---------- */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    border: 1px solid var(--line);
+    background: var(--bg-elevated);
+    padding: 8px 14px;
+    border-radius: 20px;
+    color: var(--ink-muted);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Scope (out of scope list) ---------- */
+  .scope ul {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px 24px;
+  }
+  .scope li {
+    font-size: 0.92rem;
+    color: var(--ink-muted);
+    padding-left: 18px;
+    position: relative;
+  }
+  .scope li::before {
+    content: "×";
+    position: absolute; left: 0;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+  }
+
+  footer {
+    padding: 40px 0 80px;
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="wrap">
+
+    <header class="hero">
+      <span class="eyebrow">1ヶ月・人間の介入ゼロ 検証</span>
+      <h1>占い師「藍」を、まるごとAIに任せてみる</h1>
+      <p class="sub">
+        投稿文を書くのも、来週の方針を決め直すのも全部AI。人間がやるのは最初にコードを置くことだけ。
+        この図解では、その裏側で実際に動いている仕組みを一枚ずつ分解する。
+      </p>
+      <div class="persona">
+        <span class="name">🔮 ギャル占い師「藍」</span>
+        <span class="tag">ジャンル: <b>恋愛 × 占い</b></span>
+        <span class="tag">狙い: <b>本質的な共感</b></span>
+        <span class="tag">絶対のルール: <b>口調は崩す。内容は崩さない</b></span>
+      </div>
+    </header>
+
+    <section class="stats reveal">
+      <div class="stat">
+        <div class="num">📅 30日間</div>
+        <div class="label">検証期間</div>
+      </div>
+      <div class="stat">
+        <div class="num">📮 最大180</div>
+        <div class="label">投稿数（1日6回 × 30日）</div>
+      </div>
+      <div class="stat">
+        <div class="num">🔄 週1回</div>
+        <div class="label">AIが自分の方針を書き換える</div>
+      </div>
+      <div class="stat">
+        <div class="num">🙅 0回</div>
+        <div class="label">人間が投稿文に手を入れた回数</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="wrap wide">
+    <section class="block reveal">
+      <span class="kicker">System Architecture</span>
+      <h2>システム構成図</h2>
+      <p class="lede">登場するのは5つだけ。矢印は実際のデータの流れ。矢印上の①〜⑤は、1回の投稿処理（daily.yml）が実際に進む順番。</p>
+      <div class="chips" style="margin-bottom: 28px;">
+        <span class="chip">🔑 <b>GitHub Secrets</b></span>
+        <span class="chip">⏰ <b>2つのワークフロー</b></span>
+        <span class="chip">🤖 <b>GitHub Actions Runner</b></span>
+        <span class="chip">✨💬 <b>2つの外部API</b></span>
+        <span class="chip">📒 <b>Gitリポジトリ</b></span>
+      </div>
+
+      <div class="diagram-scroll">
+        <svg viewBox="0 0 1000 520" role="img" aria-label="daily.ymlとweekly.ymlがGitHub Actions Runnerを起動し、RunnerがGemini APIとThreads APIを呼び出しながらGitリポジトリ内のファイルを読み書きするシステム構成図">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-faint)"></path>
+            </marker>
+            <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--gold)"></path>
+            </marker>
+          </defs>
+
+          <!-- Top row: triggers -->
+          <rect x="20" y="20" width="300" height="70" rx="4" fill="var(--bg-elevated)" stroke="var(--line)" stroke-width="1.5"></rect>
+          <text x="170" y="47" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="700" fill="var(--ink)">🔑 GitHub Secrets</text>
+          <text x="170" y="70" text-anchor="middle" font-family="var(--font-body)" font-size="11.5" fill="var(--ink-muted)">＝ 秘密の鍵。トークン・APIキーを保管</text>
+
+          <rect x="350" y="20" width="300" height="70" rx="4" fill="var(--bg-elevated)" stroke="var(--line)" stroke-width="1.5"></rect>
+          <text x="500" y="47" text-anchor="middle" font-family="var(--font-mono)" font-size="15" font-weight="700" fill="var(--ink)">⏰ daily.yml</text>
+          <text x="500" y="70" text-anchor="middle" font-family="var(--font-body)" font-size="11" fill="var(--ink-muted)">＝ 1日6回のタイマー（07/12/18/21/23/01時 JST）</text>
+
+          <rect x="680" y="20" width="300" height="70" rx="4" fill="var(--bg-elevated)" stroke="var(--line)" stroke-width="1.5"></rect>
+          <text x="830" y="47" text-anchor="middle" font-family="var(--font-mono)" font-size="15" font-weight="700" fill="var(--ink)">🗓️ weekly.yml</text>
+          <text x="830" y="70" text-anchor="middle" font-family="var(--font-body)" font-size="11.5" fill="var(--ink-muted)">＝ 週1回のタイマー（毎週月曜03:00 JST）</text>
+
+          <!-- Mid row: Runner -->
+          <rect x="20" y="110" width="620" height="130" rx="4" fill="var(--bg-sunken)" stroke="var(--accent)" stroke-width="2"></rect>
+          <text x="330" y="142" text-anchor="middle" font-family="var(--font-body)" font-size="17" font-weight="700" fill="var(--ink)">🤖 GitHub Actions Runner</text>
+          <text x="330" y="162" text-anchor="middle" font-family="var(--font-body)" font-size="12" fill="var(--ink-muted)">＝ 作業ロボット（使い捨てPC・Python 3.12）</text>
+          <text x="330" y="192" text-anchor="middle" font-family="var(--font-body)" font-size="13" fill="var(--ink)">daily：文章を作ってThreadsへ投稿</text>
+          <text x="330" y="214" text-anchor="middle" font-family="var(--font-body)" font-size="13" fill="var(--ink)">weekly：結果を集計し方針を更新</text>
+
+          <!-- External APIs -->
+          <rect x="680" y="110" width="300" height="60" rx="4" fill="var(--bg-elevated)" stroke="var(--gold)" stroke-width="2"></rect>
+          <text x="830" y="136" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="700" fill="var(--ink)">✨ Gemini API</text>
+          <text x="830" y="156" text-anchor="middle" font-family="var(--font-body)" font-size="11" fill="var(--ink-muted)">＝ GoogleのAI（生成・埋め込み）</text>
+
+          <rect x="680" y="180" width="300" height="60" rx="4" fill="var(--bg-elevated)" stroke="var(--gold)" stroke-width="2"></rect>
+          <text x="830" y="206" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="700" fill="var(--ink)">💬 Threads API</text>
+          <text x="830" y="226" text-anchor="middle" font-family="var(--font-body)" font-size="11" fill="var(--ink-muted)">＝ 投稿・インサイト取得に使うAPI</text>
+
+          <!-- Repository -->
+          <rect x="20" y="260" width="620" height="230" rx="4" fill="var(--bg-sunken)" stroke="var(--accent)" stroke-width="2"></rect>
+          <text x="330" y="288" text-anchor="middle" font-family="var(--font-body)" font-size="17" font-weight="700" fill="var(--ink)">📒 Gitリポジトリ（記録ノート）</text>
+          <text x="330" y="306" text-anchor="middle" font-family="var(--font-body)" font-size="11.5" fill="var(--ink-muted)">＝ サーバー・DB不要。ファイルで全状態を管理</text>
+          <text x="330" y="321" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-faint)">🌱 seeds.jsonl・ephemeris.jsonl は build_seeds.py / build_ephem.py で最初に1回だけ作成</text>
+
+          <rect x="40" y="344" width="180" height="42" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="130" y="362" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">✍️ strategy.md</text>
+          <text x="130" y="378" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">📖読む＝方針(AIへの指示)</text>
+
+          <rect x="240" y="344" width="180" height="42" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"></rect>
+          <text x="330" y="362" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">✍️ gyaru_lexicon.md</text>
+          <text x="330" y="378" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">📖読む＝語彙(AIへの指示)</text>
+
+          <rect x="440" y="344" width="180" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--line)"></rect>
+          <text x="530" y="362" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">🎴 seeds.jsonl</text>
+          <text x="530" y="378" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">📖読→✏️更新(使用済みに)</text>
+
+          <rect x="40" y="394" width="180" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--line)"></rect>
+          <text x="130" y="412" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">🌙 ephemeris.jsonl</text>
+          <text x="130" y="428" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">📖読むだけ(星まわり)</text>
+
+          <rect x="240" y="394" width="180" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--line)"></rect>
+          <text x="330" y="412" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">📝 posts.jsonl</text>
+          <text x="330" y="428" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">📖読→✏️追記(投稿記録)</text>
+
+          <rect x="440" y="394" width="180" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--line)" stroke-dasharray="3 3"></rect>
+          <text x="530" y="412" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">📈 metrics.jsonl</text>
+          <text x="530" y="428" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--ink-muted)">✏️週次のみ書く</text>
+
+          <text x="330" y="470" text-anchor="middle" font-family="var(--font-body)" font-size="12" fill="var(--ink-muted)">実行のたびに read → 更新 → commit &amp; push（＝ノートを開いて書き足して閉じる）</text>
+          <text x="330" y="486" text-anchor="middle" font-family="var(--font-body)" font-size="10" fill="var(--ink-faint)">この他 requirements.txt・README.md・.gitignore もリポジトリ直下にあるが、実行中に書き換わることはない</text>
+          <text x="330" y="502" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" fill="var(--accent)">✍️ strategy.md と gyaru_lexicon.md は毎回まるごとGeminiへのプロンプト文に埋め込まれる＝AIへの実際の指示文はこの2ファイルが本体</text>
+
+          <!-- Connectors: triggers -> runner -->
+          <line x1="170" y1="90" x2="170" y2="110" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+          <rect x="130" y="94" width="80" height="16" fill="var(--bg)"></rect>
+          <text x="170" y="106" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--ink-faint)">env注入</text>
+
+          <line x1="500" y1="90" x2="430" y2="110" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+          <rect x="392" y="96" width="72" height="16" fill="var(--bg)"></rect>
+          <text x="428" y="108" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--accent)" font-weight="700">① 起動</text>
+
+          <line x1="830" y1="90" x2="580" y2="110" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+          <rect x="640" y="98" width="56" height="16" fill="var(--bg)"></rect>
+          <text x="668" y="110" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--ink-faint)">起動</text>
+
+          <!-- Connectors: runner <-> external APIs -->
+          <line x1="640" y1="140" x2="680" y2="140" stroke="var(--gold)" stroke-width="1.5" marker-start="url(#arrow-gold)" marker-end="url(#arrow-gold)"></line>
+          <rect x="572" y="118" width="156" height="16" fill="var(--bg)"></rect>
+          <text x="650" y="130" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--accent)" font-weight="700">③ 生成 / 埋め込み</text>
+
+          <line x1="640" y1="210" x2="680" y2="210" stroke="var(--gold)" stroke-width="1.5" marker-start="url(#arrow-gold)" marker-end="url(#arrow-gold)"></line>
+          <rect x="600" y="188" width="80" height="16" fill="var(--bg)"></rect>
+          <text x="640" y="200" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--accent)" font-weight="700">④ 投稿</text>
+          <text x="830" y="255" text-anchor="middle" font-family="var(--font-body)" font-size="10" fill="var(--ink-faint)">📊 インサイト取得は1日1回だけ別ジョブで実行</text>
+
+          <!-- Connectors: runner <-> repository -->
+          <line x1="300" y1="240" x2="300" y2="260" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+          <rect x="298" y="244" width="140" height="16" fill="var(--bg)"></rect>
+          <text x="368" y="256" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--accent)" font-weight="700">② checkout（読込）</text>
+
+          <line x1="450" y1="260" x2="450" y2="240" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+          <rect x="447" y="244" width="172" height="16" fill="var(--bg)"></rect>
+          <text x="533" y="256" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--accent)" font-weight="700">⑤ commit &amp; push（書込）</text>
+          <text x="533" y="270" text-anchor="middle" font-family="var(--font-body)" font-size="9.5" fill="var(--ink-faint)">投稿は完了済み・記録を保存するだけの後処理</text>
+        </svg>
+      </div>
+
+      <div class="legend-wrap">
+        <div class="table-scroll">
+          <table class="legend-table">
+            <thead>
+              <tr><th>コンポーネント</th><th>役割</th><th>技術・詳細</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>🔑 GitHub Secrets</td>
+                <td>認証情報の保管</td>
+                <td>コードには一切書かず、実行時だけRunnerへ渡す。<code>THREADS_ACCESS_TOKEN</code> / <code>THREADS_USER_ID</code> / <code>GEMINI_API_KEY</code> の3つ。</td>
+              </tr>
+              <tr>
+                <td>⏰ daily.yml</td>
+                <td>日次実行のトリガー</td>
+                <td>cron ×6（07:00/12:00/18:00/21:00/23:00/01:00 JST）+ <code>workflow_dispatch</code>（手動実行）。同時実行を防ぐ concurrency 設定つき。</td>
+              </tr>
+              <tr>
+                <td>🗓️ weekly.yml</td>
+                <td>週次実行のトリガー</td>
+                <td>cron ×1（月曜03:00 JST）+ <code>workflow_dispatch</code>。<code>aggregate.py</code> → <code>review.py</code> の順に実行。</td>
+              </tr>
+              <tr>
+                <td>🤖 GitHub Actions Runner</td>
+                <td>スクリプトの実行環境</td>
+                <td>毎回払い出される使い捨てVM（Python 3.12）。起動時に <code>checkout</code>、終了時に <code>commit &amp; push</code> して消える。このほか <code>build_seeds.py</code> / <code>build_ephem.py</code> を企画開始前に1回だけ手動実行し、<code>seeds.jsonl</code> / <code>ephemeris.jsonl</code> を作る。</td>
+              </tr>
+              <tr>
+                <td>✨ Gemini API</td>
+                <td>投稿文の生成・重複チェック用の埋め込み</td>
+                <td><code>post.py</code>（本文生成・埋め込み計算）と <code>review.py</code>（方針の書き換え案の生成）から呼び出される。</td>
+              </tr>
+              <tr>
+                <td>💬 Threads API</td>
+                <td>投稿の公開・実績の取得</td>
+                <td>下書き作成 → <code>creation_id</code> で公開する2段階方式。<code>collect.py</code> が views/likes/followers_count 等を取得。</td>
+              </tr>
+              <tr>
+                <td>📒 Gitリポジトリ</td>
+                <td>唯一の永続化層</td>
+                <td>DBもサーバーも使わず、JSONL/Markdownのファイル群だけで状態を管理。全履歴が git のコミットログとして残る。</td>
+              </tr>
+              <tr>
+                <td>📦 requirements.txt</td>
+                <td>依存パッケージの一覧</td>
+                <td><code>requests</code> / <code>google-genai</code> / <code>skyfield</code> の3つだけ。Runner起動時に <code>pip install -r requirements.txt</code> で読み込む。</td>
+              </tr>
+              <tr>
+                <td>📖 README.md / .gitignore</td>
+                <td>リポジトリの説明・Git管理対象外の指定</td>
+                <td>実行中に書き換わることはない静的なファイル。<code>.gitignore</code> は skyfield が使う天体暦データ(<code>de421.bsp</code>)などをコミット対象から除外する。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+
+    <section class="block reveal">
+      <span class="kicker">Foundations</span>
+      <h2>土台となる3つの約束事</h2>
+      <p class="lede">サーバーもデータベースも使わない代わりに、この3つのルールで全体を縛っている。</p>
+      <div class="rule-grid">
+        <div class="rule">
+          <h3>🖥️ 実行基盤はGitHub Actionsだけ</h3>
+          <p>サーバーもDBも借りない。データの保存先も同じGitリポジトリの中のファイルで、実行のたびにスクリプト自身が commit &amp; push する。</p>
+        </div>
+        <div class="rule">
+          <h3>🛡️ キャラの中身は誰にも壊させない</h3>
+          <p>「口調は崩す。内容は崩さない」など6つの絶対ルールを明文化。週に1回AIが方針を書き換える時も、このルールだけは機械的にチェックして守らせる。</p>
+        </div>
+        <div class="rule">
+          <h3>🧮 数字の集計にAIを使わない</h3>
+          <p>どのパターンの反応が良かったかはプログラムが淡々と計算する。AIに数字を作らせず、AIには「正しい集計結果」だけを渡して判断させる。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block reveal">
+      <div class="callout">
+        <span class="q">Q. 投稿ってどこに残るの？</span>
+        <div>
+          <p>
+            投稿ログ（<code>data/posts.jsonl</code>）も、方針（<code>strategy.md</code>）も、使った語彙（<code>gyaru_lexicon.md</code>）も、
+            全部このGitHubリポジトリの中の“ただのファイル”。
+          </p>
+          <p>
+            作業ロボットは動くたびにノートをまっさらな状態から開き、投稿が終わると
+            <b style="color:var(--ink)">ロボット自身がその内容をノートに書き足して閉じる。</b>
+            人間の代わりにAIが自分でつける日記のようなもので、データベースを一切使わなくても履歴がそのままGitHub上に積み上がっていく。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block reveal">
+      <span class="kicker">Daily Cycle</span>
+      <h2>1日6回、同じ手順を繰り返す</h2>
+      <p class="lede">投稿は等間隔ではなく、夕方〜深夜に寄せて配置されている。</p>
+      <div class="clock-wrap">
+        <div class="clock-face">
+          <div class="clock-ring"></div>
+          <div class="clock-center">
+            <span class="n">6</span>
+            <span class="l">回 / 日</span>
+          </div>
+          <div class="slot" style="left:90.6%; top:60.9%;"><span class="dot"></span><span class="time">07:00</span></div>
+          <div class="slot" style="left:50%; top:92%;"><span class="dot"></span><span class="time">12:00</span></div>
+          <div class="slot" style="left:8%; top:50%;"><span class="dot"></span><span class="time">18:00</span></div>
+          <div class="slot" style="left:20.3%; top:20.3%;"><span class="dot"></span><span class="time">21:00</span></div>
+          <div class="slot" style="left:39.1%; top:9.4%;"><span class="dot"></span><span class="time">23:00</span></div>
+          <div class="slot" style="left:60.9%; top:9.4%;"><span class="dot"></span><span class="time">01:00</span></div>
+        </div>
+      </div>
+      <p class="clock-caption">GitHub Actionsのcronが各時刻（JST）にワークフローを起こし、そのたびに下の8手順をすべて実行する。</p>
+    </section>
+
+    <section class="block reveal">
+      <span class="kicker">Per-Post Pipeline</span>
+      <h2>投稿1回のしくみ</h2>
+      <p class="lede">ロボットが起きるたびに、この8手順を順番にこなす。</p>
+      <div class="pipeline">
+        <div class="step">
+          <span class="idx">01 🔍</span>
+          <h4>投稿もれチェック</h4>
+          <p>予定より投稿が遅れていないかを見て、遅れていれば最大2本まとめて投稿する。</p>
+        </div>
+        <div class="step">
+          <span class="idx">02 🎴</span>
+          <h4>お題を1つ選ぶ</h4>
+          <p>「恋の局面×気持ち×シーン」420通りのうち、まだ使っていないものを1つ取る。</p>
+        </div>
+        <div class="step">
+          <span class="idx">03 🌙</span>
+          <h4>星まわりを見る</h4>
+          <p>新月・満月・水星逆行など、その日の天体の出来事を調べる。何もない日はそのまま進む。</p>
+        </div>
+        <div class="step">
+          <span class="idx">04 🎯</span>
+          <h4>今日の書き方を決める</h4>
+          <p>星座に触れる/触れない × ギャル口調/標準口調、4パターンを順番に割り当てる。</p>
+        </div>
+        <div class="step ai">
+          <span class="idx">05 ✨ Gemini API</span>
+          <h4>本文を生成</h4>
+          <p>今週の方針・使う言葉・お題・星まわりを渡し、Gemini APIに1投稿ぶんの文章を書かせる。</p>
+        </div>
+        <div class="step ai">
+          <span class="idx">06 🔁 Gemini API</span>
+          <h4>似た投稿と比較</h4>
+          <p>過去の投稿と埋め込みベクトルの近さを計算。似すぎていれば書き直し、3回失敗したら別のお題に切り替える。</p>
+        </div>
+        <div class="step">
+          <span class="idx">07 📤</span>
+          <h4>Threadsへ投稿</h4>
+          <p>下書きを作ってから公開する、という2段階で実際に投稿する。</p>
+        </div>
+        <div class="step">
+          <span class="idx">08 💾</span>
+          <h4>記録して保存</h4>
+          <p>使ったお題・投稿文を記録ノートに書き足し、ロボット自身が保存する。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block reveal">
+      <span class="kicker">Weekly Cycle</span>
+      <h2>週に1回、AIが自分の方針を見直す</h2>
+      <p class="lede">月曜の朝、その週の結果を踏まえて「今週の方針」そのものを書き換える。</p>
+      <div class="loop">
+        <div class="step">
+          <span class="idx">01 📊</span>
+          <h4>1週間分を集計</h4>
+          <p>プログラムが淡々と、パターン別の閲覧数・反応率などを表にまとめる。</p>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="step ai">
+          <span class="idx">02 🧠 Gemini API</span>
+          <h4>来週の方針を提案</h4>
+          <p>集計結果だけをGemini APIに渡し、勝ち負けの判断と次に試す案をJSONで出させる。</p>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="step">
+          <span class="idx">03 🛡️</span>
+          <h4>絶対ルールを検証</h4>
+          <p>絶対に変えてはいけないルールが書き換えられていないかを機械的にチェック。もし破られていたら、そこで止めてエラーにする。</p>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="step">
+          <span class="idx">04 ✏️</span>
+          <h4>方針を更新</h4>
+          <p>今週の方針と、使ってはいけない言葉リストを書き換え、変更した理由を履歴に残す。</p>
+        </div>
+      </div>
+      <div class="loop-back">
+        <span class="ring"></span>
+        この4手順を、契約期間中は毎週月曜に繰り返す
+      </div>
+    </section>
+
+    <section class="block reveal">
+      <span class="kicker">Stack</span>
+      <h2>裏側で使っているもの（参考）</h2>
+      <div class="chips">
+        <span class="chip">🐍 <b>Python</b> — ロボットに指示を出すプログラム言語</span>
+        <span class="chip">⚙️ <b>GitHub Actions</b> — サーバー要らずでロボットを動かす仕組み</span>
+        <span class="chip">✨ <b>Gemini API</b> — GoogleのAI</span>
+        <span class="chip">💬 <b>Threads API</b> — 投稿を自動化する仕組み</span>
+        <span class="chip">🌌 <b>skyfield</b> — 星の動きを計算するツール</span>
+      </div>
+    </section>
+
+    <section class="block scope reveal" style="border-bottom:none;">
+      <span class="kicker">Out of Scope</span>
+      <h2>あえてやらないこと</h2>
+      <ul>
+        <li>Web UI・ダッシュボードは作らない</li>
+        <li>データベースは使わない</li>
+        <li>画像・動画の投稿はしない（テキストのみ）</li>
+        <li>リプライの自動送信はしない</li>
+        <li>投稿の自動削除はしない</li>
+      </ul>
+    </section>
+
+    <footer>
+      「AIにSNS運用を1ヶ月丸投げしたら、フォロワーは何人増えるのか？」— アーキテクチャ図解
+    </footer>
+
+  </div>
+</div>
+
+<script>
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) {
+      els.forEach(function (e) { e.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
+
+</body>
+</html>

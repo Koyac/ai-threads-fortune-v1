@@ -46,8 +46,9 @@ def build_seeds() -> list[dict]:
             "emotion": emotion,
             "scene": scene,
             "used": False,           # post.py がこの種を使ったら True にする
-            # "skipped" は重複チェックで規定回数弾かれた種にだけ post.py が付け足すフィールド。
-            # 最初は付けない（＝まだ一度も弾かれていない状態）。
+            # 以前は重複で弾かれた種に "skipped" を付けて捨てていたが、それが原因で
+            # 1本も投稿できない日が出たため廃止した。今は重複が解消できなくても
+            # 一番似ていない候補を採用して必ず投稿する（post.py の generate_unique_post 参照）。
         })
     return seeds
 
